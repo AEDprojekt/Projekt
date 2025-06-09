@@ -28,6 +28,11 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             logging.error(f"Invalid JSON in request: {e}")
             return func.HttpResponse("Invalid JSON body", status_code=400)
 
+        # Sprawdzenie, czy dane są typu dict
+        if not isinstance(data, dict):
+            logging.error(f"Data is not a dict: {type(data)}")
+            return func.HttpResponse("Input data must be a JSON object", status_code=400)
+
         # Walidacja wymaganych pól
         required_fields = ["lat", "lon", "user", "address"]
         if not all(field in data for field in required_fields):
@@ -35,18 +40,22 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse("Missing required fields", status_code=400)
 
         # Dodanie dokumentu do bazy
-        collection.insert_one({
-            "geometry": {
-                "type": "Point",
-                "coordinates": [data["lon"], data["lat"]]
-            },
-            "properties": {
-                "added_by": data["user"],
-                "address": data["address"]
-            }
-        })
-        logging.info("AED point added successfully.")
-        return func.HttpResponse("Dodano punkt AED", status_code=201)
+        try:
+            collection.insert_one({
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [data["lon"], data["lat"]]
+                },
+                "properties": {
+                    "added_by": data["user"],
+                    "address": data["address"]
+                }
+            })
+            logging.info("AED point added successfully.")
+            return func.HttpResponse("Dodano punkt AED", status_code=201)
+        except Exception as db_exc:
+            logging.exception("Database insert failed")
+            return func.HttpResponse(f"Database insert failed: {str(db_exc)}", status_code=500)
 
     except Exception as e:
         logging.exception("Function AddAEDPoint failed with exception")

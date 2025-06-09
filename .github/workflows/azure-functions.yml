@@ -20,9 +20,16 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd AED-functionapp
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Deploy to Azure Function App
+        uses: Azure/functions-action@v1
+        with:
+          app-name: AED-functionapp
+          package: .
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+
 
       - name: Deploy to Azure Function App
         uses: Azure/functions-action@v1

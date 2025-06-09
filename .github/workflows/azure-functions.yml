@@ -18,19 +18,22 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install dependencies (for linting/tests only)
         run: |
           cd AED-functionapp
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      # (opcjonalnie: możesz dodać testy jednostkowe tutaj)
 
       - name: Login to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to Azure Function App
+      - name: Deploy to Azure Function App (with remote build)
         uses: Azure/functions-action@v1
         with:
-          app-name: AED-functionapp  # <- zachowana oryginalna nazwa
+          app-name: AED-functionapp
           package: ./AED-functionapp
+          enable-oryx-build: true  # wymusza zdalną instalację zależności w Azure

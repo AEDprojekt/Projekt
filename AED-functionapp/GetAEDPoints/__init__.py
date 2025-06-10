@@ -4,50 +4,49 @@ import pymongo
 import os
 import json
 from bson import json_util
-
-# Importy potrzebne do obsługi Key Vault
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('GetAEDPoints function triggered to fetch all points.')
+    logging.info('GetAEDPoints function triggered.')
 
     try:
-        # --- POCZĄTEK BLOKU KEY VAULT ---
-        # Uwierzytelnienie za pomocą Tożsamości Zarządzanej aplikacji (Managed Identity)
-        credential = DefaultAzureCredential()
-        
-        # Pobranie URI Twojego Key Vault ze Zmiennych Środowiskowych (Ustawień Aplikacji)
+        credential = DefaultAzureCredential() #Pobieramy sekrety z Key Vault ---
         key_vault_uri = os.environ["KEYVAULT_URI"]
-        
-        # Połączenie z Key Vault i pobranie sekretu
         secret_client = SecretClient(vault_url=key_vault_uri, credential=credential)
         cosmos_conn_str = secret_client.get_secret("cosmosdb-conn-string").value
-        # --- KONIEC BLOKU KEY VAULT ---
 
-        # Połączenie z bazą danych przy użyciu pobranego sekretu
+        #Połączenie z bazą
         client = pymongo.MongoClient(cosmos_conn_str)
         db = client["AEDdb"]
         collection = db["AEDpoints"]
 
-        # Pobierz wszystkie dokumenty z kolekcji
-        all_points = list(collection.find({}))
         
-        # Użyj json_util do poprawnego przekonwertowania danych z MongoDB (w tym ObjectId) na JSON
-        response_body = json.dumps(all_points, default=json_util.default)
+        all_docs = list(collection.find({})) #Pobieramy wszystkich dokumentów
+        
+        #unifikowanie punktów z geometry i location
+        clean_points = []
+        for doc in all_docs:
+            geometry = doc.get("geometry") or doc.get("location") #Ujednolicamy pole z geometrią
+            
+            # Dodajemy do listy tylko te punkty, które mają poprawne współrzędne
+            if geometry and "coordinates" in geometry and len(geometry["coordinates"]) == 2:
+                clean_point = {
+                    "geometry": geometry, #Zawsze zwracamy współrzędne w polu "geometry"
+                    "properties": doc.get("properties", {}) #Zawsze zwracamy współrzędne w polu "geometry"
+                }
+                clean_points.append(clean_point)
+        
+        response_body = json.dumps(clean_points, default=json_util.default) # Konwertujemy na JSON naszą czystą zunifikowaną listę punktów
 
-        logging.info(f"Successfully retrieved {len(all_points)} documents.")
+        logging.info(f"Successfully retrieved and cleaned {len(clean_points)} documents.")
 
         return func.HttpResponse(
             body=response_body,
             status_code=200,
             mimetype="application/json",
-            headers={
-                "Access-Control-Allow-Origin": "*" # Zapewnienie CORS
-            }
+            headers={"Access-Control-Allow-Origin": "*"}
         )
     except Exception as e:
-        # Zapisz szczegółowy błąd w logach Azure
         logging.exception(f"An exception occurred in GetAEDPoints: {e}")
-        # Zwróć generyczny błąd do klienta
         return func.HttpResponse("Internal Server Error", status_code=500)

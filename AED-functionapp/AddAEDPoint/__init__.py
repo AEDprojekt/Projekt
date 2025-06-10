@@ -17,8 +17,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 
         # Połączenie z bazą
         client = pymongo.MongoClient(cosmos_conn_str)
-        db = client["AEDprojektdb"]
-        collection = db["aed_lokacje"]
+        db = client["AEDdb"]
+        collection = db["AEDpoints"]
 
         # Parsowanie danych wejściowych
         try:
